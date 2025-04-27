@@ -1,9 +1,6 @@
 package frc.robot.lib.camera;
 
-import java.util.List;
-import java.util.Optional;
-
-import org.photonvision.EstimatedRobotPose;
+import org.apache.commons.math3.geometry.euclidean.threed.Vector3D;
 import org.photonvision.PhotonCamera;
 import org.photonvision.PhotonPoseEstimator;
 import org.photonvision.PhotonPoseEstimator.PoseStrategy;
@@ -11,96 +8,80 @@ import org.photonvision.targeting.PhotonTrackedTarget;
 
 import edu.wpi.first.apriltag.AprilTagFieldLayout;
 import edu.wpi.first.apriltag.AprilTagFields;
-import edu.wpi.first.math.Matrix;
-import edu.wpi.first.math.VecBuilder;
 import edu.wpi.first.math.geometry.Pose2d;
+import edu.wpi.first.math.geometry.Pose3d;
+import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.geometry.Rotation3d;
 import edu.wpi.first.math.geometry.Transform3d;
+import edu.wpi.first.math.geometry.Translation2d;
 import edu.wpi.first.math.geometry.Translation3d;
-import edu.wpi.first.math.numbers.N1;
-import edu.wpi.first.math.numbers.N3;
-import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
+import frc.robot.lib.math.PoseTransform;
 
 public class PhotonHelper {
     private final PhotonCamera camera;
     private final AprilTagFieldLayout layout = AprilTagFieldLayout.loadField(AprilTagFields.kDefaultField);
     private final Transform3d cameraPose;
+    private final double PITCH;
+    private final double YAW;
     private final PhotonPoseEstimator estimator;
-    private final EstimateConsumer estimateConsumer;
-    private Matrix<N3, N1> curStdDevs;
-    private Matrix<N3, N1> kSingleTagStdDevs = VecBuilder.fill(0.1, 0.1, 0.1); // TODO
-    private Matrix<N3, N1> kMultiTagStdDevs = VecBuilder.fill(0, 0, 0); // TODO
+    private final PoseTransform poseTransform;
+    private int tagId = -1;
 
     public PhotonHelper(
         String camName,
-        Translation3d cameraTranslation, Rotation3d cameraRotation,
-        EstimateConsumer estimateConsumer
+        Translation3d cameraTranslation,
+        double pitch, double yaw
     ) {
         this.camera = new PhotonCamera(camName);
-        this.cameraPose = new Transform3d(cameraTranslation, cameraRotation);
-        this.estimator = new PhotonPoseEstimator(this.layout, PoseStrategy.MULTI_TAG_PNP_ON_COPROCESSOR, this.cameraPose);
+        this.cameraPose = new Transform3d(cameraTranslation, new Rotation3d(0.0, pitch, yaw));
+        this.estimator = new PhotonPoseEstimator(this.layout, PoseStrategy.CLOSEST_TO_REFERENCE_POSE, this.cameraPose);
         this.estimator.setMultiTagFallbackStrategy(PoseStrategy.LOWEST_AMBIGUITY);
-        this.estimateConsumer = estimateConsumer;
+        this.poseTransform = new PoseTransform(new Vector3D(cameraTranslation.getX(), cameraTranslation.getY(), cameraTranslation.getZ()));
+        this.PITCH = pitch;
+        this.YAW = yaw;
     }
 
-    public void periodic() {
-        Optional<EstimatedRobotPose> pose = Optional.empty();
-        for (var change : camera.getAllUnreadResults()) {
-            pose = this.estimator.update(change);
-            this.updateEstimationStdDevs(pose, change.getTargets());
+    public Translation3d getRobotToTag() {
+        var result = this.camera.getLatestResult();
+        if (result == null || !result.hasTargets()) return null;
+        PhotonTrackedTarget target = result.getBestTarget();
+        if (target == null) return null;
 
-            pose.ifPresent(
-                est -> {
-                    // Change our trust in the measurement based on the tags we can see
-                    var estStdDevs = getEstimationStdDevs();
-                    this.estimateConsumer.accept(est.estimatedPose.toPose2d(), est.timestampSeconds, estStdDevs);
-                    });
-        }
+        this.tagId = target.fiducialId;
+        Transform3d cameraToTag = target.getBestCameraToTarget();
+        return this.poseTransform.getTransform(cameraToTag, this.PITCH, this.YAW);
     }
 
-    public Matrix<N3, N1> getEstimationStdDevs() {
-        return curStdDevs;
+    public Pose2d getRobotToTagPose() {
+        Translation3d translation3d = this.getRobotToTag();
+        if (translation3d == null) return new Pose2d();
+        return new Pose2d(translation3d.toTranslation2d(), new Rotation2d());
     }
 
-    private void updateEstimationStdDevs(Optional<EstimatedRobotPose> estimatedPose, List<PhotonTrackedTarget> targets) {
-        System.out.println(estimatedPose.isEmpty());
-        if (estimatedPose.isEmpty()) {
-            // No pose input. Default to single-tag std devs
-            curStdDevs = kSingleTagStdDevs;
-            return;
-        }
+    public Pose2d getRobotField() {
+        Translation3d translation3d = this.getRobotToTag();
+        if (translation3d == null) return new Pose2d(0.0, 0.0, new Rotation2d());
+        Transform3d tagToRobot = new Transform3d(translation3d, new Rotation3d(0.0, 0.0, Math.PI));
+        
+        Pose3d fieldToTag = this.layout.getTagPose(this.tagId).get();
+        Pose3d fieldToRobot = fieldToTag.transformBy(tagToRobot);
 
-        // Pose present. Start running Heuristic
-        var estStdDevs = kSingleTagStdDevs;
-        int numTags = 0;
-        double avgDist = 0;
-
-        // Precalculation - see how many tags we found, and calculate an average-distance metric
-        for (var target : targets) {
-            var tagPose = this.estimator.getFieldTags().getTagPose(target.getFiducialId());
-            SmartDashboard.putString("TargetPose Pose", tagPose.get().toString());
-            if (tagPose.isEmpty()) continue;
-            numTags++;
-            avgDist += tagPose.get().toPose2d().getTranslation().getDistance(
-                estimatedPose.get().estimatedPose.toPose2d().getTranslation());
-        }
-
-        if (numTags == 0) {
-            curStdDevs = kSingleTagStdDevs;
-            return;
-        }
-        // One or more tags visible, run the full heuristic.
-        avgDist /= numTags;
-        // Decrease std devs if multiple targets are visible
-        if (numTags > 1) estStdDevs = kMultiTagStdDevs;
-        // Increase std devs based on (average) distance
-        if (numTags == 1 && avgDist > 4) estStdDevs = VecBuilder.fill(Double.MAX_VALUE, Double.MAX_VALUE, Double.MAX_VALUE);
-        else estStdDevs = estStdDevs.times(1 + (avgDist * avgDist / 30));
-        curStdDevs = estStdDevs;
+        return fieldToRobot.toPose2d();
     }
 
-    @FunctionalInterface
-    public static interface EstimateConsumer {
-        public void accept(Pose2d pose, double timestamp, Matrix<N3, N1> estimationStdDevs);
+    public double getTimeStamp() {
+        var result = this.camera.getLatestResult();
+        if (result == null) return -1;
+        return result.getTimestampSeconds();
+    }
+
+    public boolean hasTarget() {
+        var result = this.camera.getLatestResult();
+        if (result == null) return false;
+        return result.hasTargets();
+    }
+
+    public interface MeasurementProvider {
+        void addVisionMeasurement(Pose2d visionMeasurement, double timestampSeconds);   
     }
 }

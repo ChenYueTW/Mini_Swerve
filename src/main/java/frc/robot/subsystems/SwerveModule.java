@@ -71,10 +71,10 @@ public class SwerveModule implements IDashboardProvider {
 
     @Override
     public void putDashboard() {
-        SmartDashboard.putNumber(this.moduleName + " Drive Velocity", this.drive.getVelocity());
-        SmartDashboard.putNumber(this.moduleName + " Drive Position", this.drive.getPosition());
-        SmartDashboard.putNumber(this.moduleName + " Drive Voltage", this.drive.getBusVoltage());
-        SmartDashboard.putNumber(this.moduleName + " Turn Position", this.encoder.getRotation().getRotations());
-        SmartDashboard.putNumber(this.moduleName + " Turn Voltage", this.turn.getBusVoltage());
+        SmartDashboard.putNumber(this.moduleName + "/Drive Velocity", this.drive.getVelocity());
+        SmartDashboard.putNumber(this.moduleName + "/Drive Position", this.drive.getPosition());
+        SmartDashboard.putNumber(this.moduleName + "/Drive Voltage", this.drive.getBusVoltage());
+        SmartDashboard.putNumber(this.moduleName + "/Turn Position", this.encoder.getRotation().getRotations());
+        SmartDashboard.putNumber(this.moduleName + "/Turn Voltage", this.turn.getBusVoltage());
     }
 }

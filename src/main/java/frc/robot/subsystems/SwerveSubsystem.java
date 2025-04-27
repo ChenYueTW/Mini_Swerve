@@ -1,9 +1,5 @@
 package frc.robot.subsystems;
 
-import com.pathplanner.lib.auto.AutoBuilder;
-import com.pathplanner.lib.config.PIDConstants;
-import com.pathplanner.lib.config.RobotConfig;
-import com.pathplanner.lib.controllers.PPHolonomicDriveController;
 import com.studica.frc.AHRS;
 import com.studica.frc.AHRS.NavXComType;
 
@@ -20,6 +16,8 @@ import edu.wpi.first.math.kinematics.SwerveModuleState;
 import edu.wpi.first.math.numbers.N1;
 import edu.wpi.first.math.numbers.N3;
 import edu.wpi.first.math.util.Units;
+import edu.wpi.first.networktables.NetworkTableInstance;
+import edu.wpi.first.networktables.StructPublisher;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import frc.robot.SwerveConstants;
 import frc.robot.lib.subsystems.SubsystemBase;
@@ -42,6 +40,9 @@ public class SwerveSubsystem extends SubsystemBase {
         false, false,
         "BackRight");
     private final AHRS gyro = new AHRS(NavXComType.kMXP_SPI);
+
+    private final StructPublisher<Pose2d> swervePose = NetworkTableInstance.getDefault()
+        .getStructTopic("AdvantageScope/SwervePose", Pose2d.struct).publish();
 
     Vector<N3> stateStdDevs = VecBuilder.fill(0.1, 0.1, 0.1);
     Vector<N3> visionStdDevs = VecBuilder.fill(1, 1, 1);
@@ -74,6 +75,7 @@ public class SwerveSubsystem extends SubsystemBase {
     public void periodic() {
         this.poseEstimator.update(
             this.getRotation2d(), this.getSwervePosition());
+        this.swervePose.accept(this.poseEstimator.getEstimatedPosition());
     }
 
     public double getHeading() {
