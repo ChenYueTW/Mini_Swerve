@@ -16,17 +16,17 @@ public class SwerveSpark extends SparkMax {
             .inverted(reverse)
             .idleMode(IdleMode.kBrake)
             .smartCurrentLimit(isDrive ? 80 : 20)
-            .voltageCompensation(isDrive ? SwerveConstants.MAX_DRIVE_VOLTAGE : SwerveConstants.MAX_TURN_VOLTAGE)
-            .closedLoopRampRate(0.1);
+            .voltageCompensation(isDrive ? SwerveConstants.MAX_DRIVE_VOLTAGE : SwerveConstants.MAX_TURN_VOLTAGE);
+            // .closedLoopRampRate(0.1);
         this.configure(config, ResetMode.kResetSafeParameters, PersistMode.kPersistParameters);
         this.GEAR_RATIO = gearRatio;
     }
 
     public double getVelocity() {
-        return this.getEncoder().getVelocity() / 60.0 * 2 * SwerveConstants.WHEEL_RADIUS * this.GEAR_RATIO;
+        return this.getEncoder().getVelocity() / 60.0 * 2.0 * SwerveConstants.WHEEL_RADIUS * Math.PI / this.GEAR_RATIO;
     }
 
     public double getPosition() {
-        return this.getEncoder().getPosition() * 2 * SwerveConstants.WHEEL_RADIUS * this.GEAR_RATIO;
+        return this.getEncoder().getPosition() * 2.0 * SwerveConstants.WHEEL_RADIUS * Math.PI / this.GEAR_RATIO;
     }
 }

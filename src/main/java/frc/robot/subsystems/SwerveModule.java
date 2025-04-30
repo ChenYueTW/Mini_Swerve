@@ -25,15 +25,16 @@ public class SwerveModule implements IDashboardProvider {
         this.drive = new SwerveSpark(driveId, driveReverse, true, SwerveConstants.DRIVE_GEAR_RATIO);
         this.turn = new SwerveSpark(turnId, turnReverse, false, SwerveConstants.TURN_GEAR_RATIO);
         this.encoder = new SwerveEncoder(encoderId);
-        this.pid = new PIDController(0.0, 0.0, 0.0);
+        this.pid = new PIDController(40.0, 0.1, 0.1);
         this.moduleName = moduleName;
 
-        this.pid.enableContinuousInput(-180.0, 180.0);
+        this.pid.enableContinuousInput(-0.5, 0.5);
+        this.resetEncoder();
     }
 
     public void resetEncoder() {
         this.drive.getEncoder().setPosition(0.0);
-        this.turn.getEncoder().setPosition(0.0);
+        this.turn.getEncoder().setPosition(this.encoder.getAbsolutePosition().getValueAsDouble());
     }
 
     public SwerveModuleState getState() {
@@ -55,10 +56,13 @@ public class SwerveModule implements IDashboardProvider {
             this.stop();
             return;
         }
-        desiredState.optimize(this.encoder.getRotation());
+        desiredState.optimize(this.getState().angle);
 
-        double driveVoltage = desiredState.speedMetersPerSecond * (SwerveConstants.MAX_DRIVE_VOLTAGE / SwerveConstants.MAX_SPEED);
-        double turnVoltage = this.pid.calculate(this.encoder.getRotation().getDegrees(), desiredState.angle.getDegrees());
+        double driveVoltage = desiredState.speedMetersPerSecond / SwerveConstants.MAX_SPEED;
+        double turnVoltage = this.pid.calculate(this.encoder.getRotation().getRotations(), desiredState.angle.getRotations());
+
+        SmartDashboard.putNumber(this.moduleName + "/desiredAngle", desiredState.angle.getRotations());
+        SmartDashboard.putNumber(this.moduleName + "/turnVoltage", turnVoltage);
 
         this.drive.setVoltage(driveVoltage);
         this.turn.setVoltage(turnVoltage);
@@ -73,8 +77,6 @@ public class SwerveModule implements IDashboardProvider {
     public void putDashboard() {
         SmartDashboard.putNumber(this.moduleName + "/Drive Velocity", this.drive.getVelocity());
         SmartDashboard.putNumber(this.moduleName + "/Drive Position", this.drive.getPosition());
-        SmartDashboard.putNumber(this.moduleName + "/Drive Voltage", this.drive.getBusVoltage());
         SmartDashboard.putNumber(this.moduleName + "/Turn Position", this.encoder.getRotation().getRotations());
-        SmartDashboard.putNumber(this.moduleName + "/Turn Voltage", this.turn.getBusVoltage());
     }
 }

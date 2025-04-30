@@ -25,27 +25,27 @@ import frc.robot.lib.subsystems.SubsystemBase;
 public class SwerveSubsystem extends SubsystemBase {
     private final SwerveModule frontLeft = new SwerveModule(
         2, 1, 9,
-        false, false,
+        false, true,
         "FrontLeft");
     private final SwerveModule frontRight = new SwerveModule(
         4, 3, 10,
-        false, false,
+        true, true,
         "FrontRight");
     private final SwerveModule backLeft = new SwerveModule(
         6, 5, 11,
-        false, false,
+        false, true,
         "BackLeft");
     private final SwerveModule backRight = new SwerveModule(
         8, 7, 12,
-        false, false,
+        true, true,
         "BackRight");
     private final AHRS gyro = new AHRS(NavXComType.kMXP_SPI);
 
     private final StructPublisher<Pose2d> swervePose = NetworkTableInstance.getDefault()
         .getStructTopic("AdvantageScope/SwervePose", Pose2d.struct).publish();
 
-    Vector<N3> stateStdDevs = VecBuilder.fill(0.1, 0.1, 0.1);
-    Vector<N3> visionStdDevs = VecBuilder.fill(1, 1, 1);
+    Vector<N3> stateStdDevs = VecBuilder.fill(0.5, 0.5, 0.5);
+    Vector<N3> visionStdDevs = VecBuilder.fill(0.1, 0.1, 0.1);
     private final SwerveDrivePoseEstimator poseEstimator = new SwerveDrivePoseEstimator(
         SwerveConstants.KINEMATICS,
         this.getRotation2d(),
@@ -62,7 +62,6 @@ public class SwerveSubsystem extends SubsystemBase {
         SwerveModuleState[] states = SwerveConstants.KINEMATICS.toSwerveModuleStates(
             fieldOriented ? ChassisSpeeds.fromFieldRelativeSpeeds(xSpeed, ySpeed, rSpeed, this.getRotation2d()) :
             new ChassisSpeeds(xSpeed, ySpeed, rSpeed));
-        SwerveDriveKinematics.desaturateWheelSpeeds(states, SwerveConstants.MAX_SPEED);
         this.setDesiredStates(states);
     }
 
@@ -128,6 +127,7 @@ public class SwerveSubsystem extends SubsystemBase {
     }
 
     public void setDesiredStates(SwerveModuleState[] states) {
+        SwerveDriveKinematics.desaturateWheelSpeeds(states, SwerveConstants.MAX_SPEED);
         this.frontLeft.setDesiredState(states[0]);
         this.frontRight.setDesiredState(states[1]);
         this.backLeft.setDesiredState(states[2]);
@@ -152,6 +152,7 @@ public class SwerveSubsystem extends SubsystemBase {
 
     @Override
     public void putDashboard() {
+        SmartDashboard.putNumber("GyroAngle", this.getHeading());
         SmartDashboard.putString("PoseEstimator", this.poseEstimator.getEstimatedPosition().toString());
     }
 }

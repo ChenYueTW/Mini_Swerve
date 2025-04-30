@@ -11,6 +11,7 @@ public class Robot extends TimedRobot {
 	private final RobotContainer robotContainer;
 
 	public Robot() {
+		super(0.01);
 		DashboardHelper.enableRegistration();
 		this.robotContainer = new RobotContainer();
 		DashboardHelper.disableRegistration();

@@ -2,6 +2,7 @@ package frc.robot.commands;
 
 import java.util.function.Supplier;
 
+import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj2.command.Command;
 import frc.robot.subsystems.SwerveSubsystem;
 
@@ -24,7 +25,7 @@ public class SwerveCmd extends Command {
 
 	@Override
 	public void execute() {
-		this.swerveSubsystem.drive(this.xSpeed.get(), this.ySpeed.get(), this.rSpeed.get(), true);
+		this.swerveSubsystem.drive(this.xSpeed.get(), this.ySpeed.get(), this.rSpeed.get(), false);
 	}
 
 	@Override
